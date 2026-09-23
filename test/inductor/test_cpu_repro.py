@@ -2665,6 +2665,13 @@ class CPUReproTests(TestCase):
                     metrics.reset()
                     self.common(fn, (x, two))
 
+    @parametrize("dtype", (torch.int8, torch.int16, torch.int32, torch.int64))
+    def test_neg_abs_int_min_wraps(self, dtype):
+        # https://github.com/pytorch/pytorch/issues/198555
+        x = torch.tensor([torch.iinfo(dtype).min, 1, -3, 7], dtype=dtype)
+        self.common(lambda x: (-x).flip(0) < 0, (x,))
+        self.common(lambda x: x.abs().flip(0) >= 0, (x,))
+
     def test_int_div(self):
         def fn(x, y):
             s3 = x.size(1)
