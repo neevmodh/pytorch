@@ -7760,8 +7760,18 @@ def mutate_to(changed, val, unsafe_alias=False):
         or changed_data.is_module_buffer()
         or isinstance(changed_data.data, ir.NopKernel)
     ):
-        # Fast path, just swing the data pointer
         val.realize()
+        if IRNode.is_realized_node(changed_data.data):
+            # A view of a realized buffer (ReinterpretView) looks the buffer's
+            # name up only when its loader runs, which is after lowering.
+            # Swinging the data pointer would make the reads lowered before
+            # this mutation, val's own included, read the new value. Keep the
+            # buffer and write val into it instead.
+            ir.MutationLayoutSHOULDREMOVE.realize_into(
+                val, changed_data, unsafe_alias=unsafe_alias
+            )
+            return changed
+        # Fast path, just swing the data pointer
         changed_data.data = val.data
         return changed
 

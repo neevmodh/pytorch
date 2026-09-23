@@ -11561,6 +11561,25 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
             ),
         )
 
+    def test_index_put_as_masked_fill_mask_reads_target_view(self):
+        # The mask reads y through a transposed view of y's realized buffer;
+        # it must see y from before the fill, not the fill's own output.
+        def fn(x):
+            y = x + x.sum(-2, keepdim=True)
+            y[y.roll(-1, -2) == y.transpose(-1, -2)] = 7
+            return y
+
+        def fn_index_put(x):
+            y = x + x.sum(-2, keepdim=True)
+            mask = y.roll(-1, -2) == y.transpose(-1, -2)
+            y.index_put_((mask,), torch.tensor(7.0, device=x.device))
+            return y
+
+        for shape in [(4, 5, 5), (3, 7, 7)]:
+            x = (torch.arange(math.prod(shape)) % 3).float().view(shape)
+            self.common(fn, (x,))
+            self.common(fn_index_put, (x,))
+
     def test_index_put_deterministic_fallback(self):
         if is_mps_backend(self.device):
             # MPS has no deterministic implementation for
